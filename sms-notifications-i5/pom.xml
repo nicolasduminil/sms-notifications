@@ -8,13 +8,6 @@
     <artifactId>sms-notifications</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-
+  <name>sms-notifications :: Iteration 5</name>
   <artifactId>sms-notifications-i5</artifactId>
-
-  <properties>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-
 </project>

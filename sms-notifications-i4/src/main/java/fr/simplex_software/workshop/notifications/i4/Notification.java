@@ -33,16 +33,16 @@ public class Notification
     phoneNumberValidator.apply(phoneNumber, region).ifSuccess(success, failure);
   }
 
-  private Consumer<String> success = to -> sendSms(to, ">>> SMS sent to %s".formatted(to));
+  static Consumer<String> success = to -> sendSms(to, ">>> SMS sent to %s".formatted(to));
 
-  private Consumer<String> failure = msg -> logError(msg);
+  static Consumer<String> failure = msg -> logError(msg);
 
-  private void logError(String message)
+  static void logError(String message)
   {
     LOG.info("### Error: %s".formatted(message));
   }
 
-  private void sendSms(String phoneNumber, String message)
+  static void sendSms(String phoneNumber, String message)
   {
     new SmsService().send(phoneNumber, message);
   }
