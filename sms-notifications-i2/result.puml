@@ -1,0 +1,7 @@
+@startuml
+interface Result
+Result <|-- Success
+Result <|-- Failure
+Failure : private String message
+Failure : String getMessage()
+@enduml
