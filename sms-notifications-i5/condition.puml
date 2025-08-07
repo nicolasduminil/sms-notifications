@@ -1,0 +1,34 @@
+@startuml
+interface Result<T>
+Result : void ifSuccess(Consumer<T> success, Consumer<String> failure)
+Result : default Result<T> success(T t)
+Result : default Result<T> failure(String message)
+Result <|-- Success
+Result <|-- Failure
+Success : private final T t
+Success : public Success(T t)
+Success : public void ifSuccess(Consumer<T> success, Consumer<String> failure)
+Failure : private String message
+Failure : public Failure (String message)
+Failure : String getMessage()
+Failure : public void ifSuccess(Consumer<T> success, Consumer<String> failure)
+
+class Tuple<T, U> {
+  private final T first;
+  private final U second;
+  public Tuple(T first, U second)
+  public T getFirst()
+  public U getSecond()
+}
+class Condition<T> {
+  public Condition(Supplier<Boolean> condition, Supplier<Result<T>> result)
+  public static <T> Condition<T> mIf(Supplier<Boolean> condition, Supplier<Result<T>> value)
+  public static <T> DefaultCondition<T> mIf(Supplier<Result<T>> value)
+  public static <T> Result<T> match(DefaultCondition<T> defaultCondition, Condition<T>... matchers)
+}
+Tuple <|-- Condition
+class DefaultCondition<T> {
+DefaultCondition(Supplier<Boolean> condition, Supplier<Result<T>> result)
+}
+Condition <|-- DefaultCondition
+@enduml

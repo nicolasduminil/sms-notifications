@@ -24,7 +24,7 @@ public class Notification
     }
     catch (NumberParseException e)
     {
-      throw new RuntimeException(e);
+      return new Failure ("### The phone number %s is not valid for region %s".formatted(number, region));
     }
   };
 
@@ -41,7 +41,7 @@ public class Notification
     new SmsService().send(phoneNumber, message);
   }
 
-  private void logError(String message)
+  private static void logError(String message)
   {
     LOG.info("### Error: %s".formatted(message));
   }

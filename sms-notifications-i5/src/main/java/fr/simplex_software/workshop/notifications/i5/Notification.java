@@ -17,11 +17,11 @@ public class Notification
 
   public BiFunction<String, String, Result<String>> phoneNumberValidator = (number, region) ->
   {
-    return match(
-      mIf(() -> new Success<>(number)),
-      mIf(() -> number == null, () -> new Failure<>("### The phone number cannot be null.")),
-      mIf(() -> number.length() == 0, () -> new Failure<>("### The phone number cannot not be empty.")),
-      mIf(() ->
+    return select(
+      when(() -> new Success<>(number)),
+      when(() -> number == null, () -> new Failure<>("### The phone number cannot be null.")),
+      when(() -> number.length() == 0, () -> new Failure<>("### The phone number cannot not be empty.")),
+      when(() ->
       {
         try
         {
@@ -29,7 +29,7 @@ public class Notification
         }
         catch (NumberParseException e)
         {
-          return true;
+          return false;
         }
       }, () -> new Failure<>("### The phone number %s is not for region %s".formatted(number, region))
     ));

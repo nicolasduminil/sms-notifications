@@ -9,18 +9,18 @@ public class Condition<T> extends Tuple<Supplier<Boolean>, Supplier<Result<T>>>
     super(condition, result);
   }
 
-  public static <T> Condition<T> mIf(Supplier<Boolean> condition, Supplier<Result<T>> value)
+  public static <T> Condition<T> when(Supplier<Boolean> condition, Supplier<Result<T>> value)
   {
     return new Condition<>(condition, value);
   }
 
-  public static <T> DefaultCondition<T> mIf(Supplier<Result<T>> value)
+  public static <T> DefaultCondition<T> when(Supplier<Result<T>> value)
   {
     return new DefaultCondition<>(() -> true, value);
   }
 
   @SafeVarargs
-  public static <T> Result<T> match(DefaultCondition<T> defaultCondition, Condition<T>... matchers)
+  public static <T> Result<T> select(DefaultCondition<T> defaultCondition, Condition<T>... matchers)
   {
     for (Condition<T> aCondition : matchers)
       if (aCondition.getFirst().get()) return aCondition.getSecond().get();

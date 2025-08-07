@@ -187,34 +187,329 @@ diagram is shown below:
 
 ![class diagram](sms-notifications-i2/result.png "Class Diagram")
 
-Yes, you cannot completely eliminate the try..catch when calling exception-throwing services. The try..catch will always exist somewhere in your codebase when interfacing with imperative APIs.
+The class diagram above shows the Result interface implemented by the `Success` and
+`Failure` classes. Now, the new version of our `Notification` is as follows:
 
-The Reality of Functional Programming in Java
-Pure functional languages like Haskell don't have exceptions - they use types like Maybe or Either for error handling
+    public class Notification
+    {
+      private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
-Java's ecosystem is built on exceptions, so you must bridge between:
+      public static BiFunction<String, String, Result> phoneNumberValidator = (number, region) ->
+      {
+        if (number == null)
+          return new Failure("### The phone number can not be null");
+        else if (number.length() == 0)
+          return new Failure("### The phone number can not be empty");
+        else
+          try
+          {
+            if (phoneNumberUtil.isValidNumber(phoneNumberUtil.parse(number, region)))
+              return new Success();
+            else
+              return new Failure("### The phone number %s is not valid for region %s".formatted(number, region));
+          }
+          catch (NumberParseException e)
+          {
+            return new Failure("### Unexpected exception while parsing the phone number %s".formatted(number));
+          }
+      };
 
-Imperative world: Libraries that throw exceptions
+      public void sendNotification(String phoneNumber, String region, String message)
+      {
+        Result result = phoneNumberValidator.apply (phoneNumber, region);
+        if (result instanceof Success)
+        {
+          SmsService sms = new SmsService();
+          sms.send(phoneNumber, message);
+        }
+        else
+          throw new IllegalArgumentException("### Invalid phone number format: %s".formatted(phoneNumber));
+      }
+    }
 
-Functional world: Your code using Result, Optional, etc.
+Running the JUnit tests against this new version will produce the expected output
+in the mentioned cases, where the phone numbers or the regions are null or empty.
+But this isn't yet satisfactory as the method `sendNotification(...)` doesn't 
+return any result and, consequently, it is hardly testable. But the worst is 
+that it throws exceptions, which is a side effect.
 
-What You Can Achieve
-The best you can do is:
+So, how could we get rid of these drawbacks ? One of the solutions would be,
+instead of sending the SMS or throwing an exception, to return an action that does
+whatever we need to do in each case. For example, to send the SMS if the validation
+is successful or to log an error message otherwise. And this could be easily done,
+thanks to lambda functions.
 
-Isolate the imperative exception handling to specific boundary methods
+## Abstracting the actions
 
-Convert exceptions to functional types (Result, Optional) at the boundary
+Let's switch now to the `sms-notifications-i3` module.
 
-Keep the core business logic purely functional
+    public class Notification
+    {
+      private static final Logger LOG = Logger.getLogger(Notification.class.getName());
+      private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
-So your phoneNumberValidator will always need that try..catch somewhere, but you can:
+      public static BiFunction<String, String, Result> phoneNumberValidator = (number, region) ->
+      {
+        try
+        {
+          return number == null
+            ? new Failure("### The phone number can not be null")
+            : number.length() == 0
+              ? new Failure("### The phone number can not be empty")
+              : phoneNumberUtil.isValidNumber(phoneNumberUtil.parse(number, region))
+                ? new Success()
+                : new Failure("### The phone number %s is not valid for region %s"
+                  .formatted(number, region));
+        }
+        catch (NumberParseException e)
+        {
+          return new Failure ("### The phone number %s is not valid for region %s"
+            .formatted(number, region));
+        }
+      };
 
-Move it to a dedicated method (cleaner separation)
+      public Runnable sendNotification(String phoneNumber, String region, String message)
+      {
+        Result result = phoneNumberValidator.apply(phoneNumber, region);
+        return (result instanceof Success)
+          ? () -> sendSms(phoneNumber, message)
+          : () -> logError(((Failure) result).getMessage());
+      }
 
-Keep the main validation logic functional
+      private void sendSms(String phoneNumber, String message)
+      {
+        new SmsService().send(phoneNumber, message);
+      }
 
-Minimize the "imperative surface area"
+      private void logError(String message)
+      {
+        LOG.info("### Error: %s".formatted(message));
+      }
+    }
 
-This is the pragmatic reality of functional programming in Java - you achieve functional style where possible while acknowledging that complete purity isn't feasible when working with exception-based APIs.
+We took advantage of this new refactoring to simplify the `phoneNumberValidator(...)`
+function by replacing the `if..then.else..` structures with the more concise 
+ternary operator based notation. But more important, our `sendNotification(...)`
+method doesn't return any more `void` but a `Runnable` which, depending on the 
+validation success or failure, is a call to either the `sendSms(...)` method, 
+or to the `logError(...)` one. And here we're touching at one of the most advanced
+functionalities of the functional programming: the ability to abstract actions 
+and to handle them as lambda functions which could be used as input arguments 
+or returned as result values.
 
-Your current approach is actually quite good - the try..catch is contained and the overall flow remains functional.
+Now the `sendNotidfication(...)` method is almost functional as it starts 
+to be closer and closer to a pure function. It is also much easier testable as 
+it allows now successful test like:
+
+    ...
+    Runnable action = notification.sendNotification("+33615229808", "FR", "Test message");
+    assertNotNull(action);
+    assertDoesNotThrow(() -> action.run());
+    ...
+
+or unsuccessful ones like:
+
+    ...
+    Runnable action = notification.sendNotification("+33615229808123", "FR", "Test message");
+    assertNotNull(action);
+    action.run();
+    assertTrue(logHandler.hasLoggedMessage("### Error: The phone number +33615229808123 is not valid for region FR"));
+    ...
+
+However, using `instanceof` to check whether the result is a success or a failure
+is an antipattern widely not advisable. Another problem is the `sendNotification(...)`
+method dependency on `sendSms(...)` or `logError(...)`. What if we want to invoke 
+different actions ? Or no action at all, just to compose the result with some 
+other function ? Well, in this case we need to decouple the `sendNotification(...)`
+method from its success or failure actions.
+
+## Decoupling functional methods from their actions
+
+In order to achieve this goal we need to refactor the `Result` hierarchy such that
+to be able to bind actions to its `Success` and `Failure` implementations. Then 
+our class diagram becomes as follows:
+
+![class diagram](sms-notifications-i4/result.png "Class Diagram")
+
+And here the listing of our new version of `Notification`, refactored as required:
+
+    public class Notification
+    {
+      private static final Logger LOG = Logger.getLogger(Notification.class.getName());
+      private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
+
+      static BiFunction<String, String, Result<String>> phoneNumberValidator = (number, region) ->
+      {
+        try
+        {
+          return number == null
+            ? new Failure("### The phone number can not be null")
+            : number.length() == 0
+              ? new Failure("### The phone number can not be empty")
+              : phoneNumberUtil.isValidNumber(phoneNumberUtil.parse(number, region))
+                ? new Success(number)
+                : new Failure("### The phone number %s is not valid for region %s"
+                  .formatted(number, region));
+        }
+        catch (NumberParseException e)
+        {
+          return new Failure("### Unexpected exception %s"
+            .formatted(e.getMessage()));
+        }
+      };
+
+      public void sendNotification (String phoneNumber, String region, String message)
+      {
+        phoneNumberValidator.apply(phoneNumber, region).ifSuccess(success, failure);
+      }
+
+      static Consumer<String> success = to -> sendSms(to, ">>> SMS sent to %s"
+        .formatted(to));
+
+      static Consumer<String> failure = msg -> logError(msg);
+
+      static void logError(String message)
+      {
+        LOG.info("### Error: %s".formatted(message));
+      }
+
+      static void sendSms(String phoneNumber, String message)
+      {
+        new SmsService().send(phoneNumber, message);
+      }
+    }
+
+In this new version, the function `phoneNumberValidator(...)` returns a parameterized
+`Result<String>`, the `Success` class holds a value of type `T`, while the `Failure`
+one holds a `String`. Two functions are now defined, one for success and the 
+other one for failure. They are both bound to actions using the `ifSuccess(...)`
+method, which hasn't probably the right name.
+
+During the previous refactoring, we have already replaced the `if..then..else` 
+structure with the ternary operator. This operator is considered functional as 
+it returns a value and it doesn't have side effects. This is as opposed to the 
+`if..then..else` controls which, in general, have side effects. Accordingly, 
+programs having several `if..then..else` structures should be refactored, not 
+only because they aren't functional, but also because they are hardly readable 
+and maintainable.
+
+This isn't, of course, our case here, however, given that the ternary operator
+can be also made non-functional, let's try to get rid of it as well.
+
+## Abstracting control structures
+
+Can we do that, can we completely remove the conditional structures or operators
+from our code ? In order to verify that, let's start by implenting th following
+class:
+
+    public class Condition<T> extends Tuple<Supplier<Boolean>, Supplier<Result<T>>>
+    {
+      public Condition(Supplier<Boolean> condition, Supplier<Result<T>> result)
+      {
+        super(condition, result);
+      }
+
+      public static <T> Condition<T> when(Supplier<Boolean> condition, Supplier<Result<T>> value)
+      {
+        return new Condition<>(condition, value);
+      }
+
+      public static <T> DefaultCondition<T> when(Supplier<Result<T>> value)
+      {
+        return new DefaultCondition<>(() -> true, value);
+      }
+
+      @SafeVarargs
+      public static <T> Result<T> select(DefaultCondition<T> defaultCondition, Condition<T>... matchers)
+      {
+        for (Condition<T> aCondition : matchers)
+          if (aCondition.getFirst().get()) return aCondition.getSecond().get();
+        return defaultCondition.getSecond().get();
+      }
+    }
+
+This class extends `Tuple`, a base class that holds a pair of generics and which
+is here parameterized with a `Suplier<Boolean>` representing a condition, and 
+a `Supplier<Result<T>>` holding the result of the condition evaluation.
+
+Then two methods, named `when`, are provided. The 1st one defines the normal case
+with a condition and a resulting boolean value. The 2nd one defines a default case
+represented by the `DefaultCondition` subclass.
+
+    public class DefaultCondition<T> extends Condition<T>
+    {
+      public DefaultCondition(Supplier<Boolean> condition, Supplier<Result<T>> result)
+      {
+        super(condition, result);
+      }
+    }
+
+The `select(...)` method selects a condition. The figure below shows the complete
+class diagram:
+
+![class diagram](sms-notifications-i5/condition.png "Class Diagram")
+
+And here is the new version of the `Notification` class:
+
+    public class Notification
+    {
+      ...
+      public BiFunction<String, String, Result<String>> phoneNumberValidator = (number, region) ->
+      {
+        return select(
+          when(() -> new Success<>(number)),
+          when(() -> number == null, () -> new Failure<>("### The phone number cannot be null.")),
+          when(() -> number.length() == 0, () -> new Failure<>("### The phone number cannot not be empty.")),
+          when(() ->
+          {
+            try
+            {
+              return !phoneNumberUtil.isValidNumber(phoneNumberUtil.parse(number, region));
+            }
+            catch (NumberParseException e)
+            {
+              return false;
+            }
+          }, () -> new Failure<>("### The phone number %s is not for region %s"
+            .formatted(number, region))));
+      };
+
+      public void sendNotification(String phoneNumber, String region, String message)
+      {
+        phoneNumberValidator.apply(phoneNumber, region).ifSuccess(success, failure);
+      }
+      ...
+    }
+
+This way we have removed the long ternary operator expression from the previous
+version, by which we have replaced the `if..then.else` control structure. Our 
+implementation starts looking more as a functional style one.
+
+However, we still have this ugly `try..catch` structure and, unfortunately, 
+there is not much to do here. Java is, inherently, an imperative programming 
+language, built on the `try..catch` concept. And we're using an external service,
+the Google phone number validator, which throws exceptions. This exceptions should
+either be caught, and that's ugly, or thrown, and then we have side effects.
+
+So yes, we need to admit it, weu cannot completely eliminate the `try..catch` 
+when calling exception-throwing services. The `try..catch` will always exist 
+somewhere in the codebase when interfacing with imperative APIs.
+
+## The reality of functional programming in Java
+
+Pure functional languages like Haskell don't have exceptions. They use types 
+like `Maybe` or `Either` for error handling. Java's ecosystem is built on exceptions,
+so we must bridge between the imperative and the functional world.
+
+The best we can do is isolate the imperative exception handling to specific 
+boundary methods and try to keep the core business logic purely functional.So,
+our `phoneNumberValidator(...)` method will always need that `try..catchè somewhere,
+but we can:
+
+  - Move it to a dedicated method (cleaner separation).
+  - Keep the main validation logic functional.
+  - Minimize the imperative surface area.
+
+This is the pragmatic reality of functional programming in Java: we achieve 
+functional style where possible while acknowledging that complete purity isn't 
+feasible when working with exception-based APIs.

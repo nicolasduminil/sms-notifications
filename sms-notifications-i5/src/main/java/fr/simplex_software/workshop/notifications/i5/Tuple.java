@@ -22,20 +22,4 @@ public class Tuple<T, U>
   {
     return second;
   }
-
-  /*@Override
-  public String toString()
-  {
-    return String.format("(%s,%s)", t, u);
-  }
-
-  public Tuple<U, T> swap()
-  {
-    return new Tuple<>(u, t);
-  }
-
-  public static <T> Tuple<T, T> swapIf(Tuple<T, T> t, Function<T, Function<T, Boolean>> p)
-  {
-    return p.apply(t.t).apply(t.u) ? t.swap() : t;
-  }*/
 }

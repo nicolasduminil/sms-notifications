@@ -3,6 +3,8 @@ package fr.simplex_software.workshop.notifications.i2.tests;
 import fr.simplex_software.workshop.notifications.i2.*;
 import org.junit.jupiter.api.*;
 
+import java.util.logging.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestNotifications
@@ -46,7 +48,6 @@ public class TestNotifications
   @Test
   public void testSendNotificationShouldSucceed()
   {
-    Notification notification = new Notification();
     assertDoesNotThrow(() ->
       notification.sendNotification("+33615229808", "FR", "Test message"));
   }
@@ -54,7 +55,6 @@ public class TestNotifications
   @Test
   public void testSendNotificationShouldFail()
   {
-    Notification notification = new Notification();
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
       notification.sendNotification("+33615229808123", "FR", "Test message"));
     assertEquals("### Invalid phone number format: +33615229808123", exception.getMessage());
@@ -63,7 +63,6 @@ public class TestNotifications
   @Test
   public void testSendNotificationWithNullNumber()
   {
-    Notification notification = new Notification();
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
       notification.sendNotification(null, "FR", "Test message"));
     assertEquals("### Invalid phone number format: null", exception.getMessage());
@@ -72,7 +71,6 @@ public class TestNotifications
   @Test
   public void testSendNotificationWithEmptyNumber()
   {
-    Notification notification = new Notification();
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
       notification.sendNotification("", "FR", "Test message"));
     assertEquals("### Invalid phone number format: ", exception.getMessage());

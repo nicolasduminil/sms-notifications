@@ -73,6 +73,7 @@ public class TestNotification
   {
     Notification notification = new Notification();
     Runnable action = notification.sendNotification("+33615229808123", "FR", "Test message");
+    assertNotNull(action);
     action.run();
     assertTrue(logHandler.hasLoggedMessage("### Error: ### The phone number +33615229808123 is not valid for region FR"));
   }
@@ -81,10 +82,9 @@ public class TestNotification
   public void testSendNotificationWithNullNumber()
   {
     Notification notification = new Notification();
-
     Runnable action = notification.sendNotification(null, "FR", "Test message");
+    assertNotNull(action);
     action.run();
-
     assertTrue(logHandler.hasLoggedMessage("### Error: ### The phone number can not be null"));
   }
 
@@ -93,6 +93,7 @@ public class TestNotification
   {
     Notification notification = new Notification();
     Runnable action = notification.sendNotification("", "FR", "Test message");
+    assertNotNull(action);
     action.run();
     assertTrue(logHandler.hasLoggedMessage("### Error: ### The phone number can not be empty"));
   }

@@ -10,7 +10,7 @@ public class Notification
   private static final Logger LOG = Logger.getLogger(Notification.class.getName());
   private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
-  static BiFunction<String, String, Result> phoneNumberValidator = (number, region) ->
+  static BiFunction<String, String, Result<String>> phoneNumberValidator = (number, region) ->
   {
     try
     {
@@ -24,7 +24,7 @@ public class Notification
     }
     catch (NumberParseException e)
     {
-      throw new RuntimeException(e);
+      return new Failure("### Unexpected exception %s".formatted(e.getMessage()));
     }
   };
 

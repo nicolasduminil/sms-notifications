@@ -1,0 +1,15 @@
+@startuml
+interface Result<T>
+Result : void ifSuccess(Consumer<T> success, Consumer<String> failure)
+Result : default Result<T> success(T t)
+Result : default Result<T> failure(String message)
+Result <|.. Success
+Result <|.. Failure
+Success : private final T t
+Success : public Success(T t)
+Success : public void ifSuccess(Consumer<T> success, Consumer<String> failure)
+Failure : private String message
+Failure : public Failure (String message)
+Failure : String getMessage()
+Failure : public void ifSuccess(Consumer<T> success, Consumer<String> failure)
+@enduml

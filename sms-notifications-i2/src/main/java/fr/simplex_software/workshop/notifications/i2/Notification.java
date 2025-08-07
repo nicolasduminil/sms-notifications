@@ -3,10 +3,12 @@ package fr.simplex_software.workshop.notifications.i2;
 import com.google.i18n.phonenumbers.*;
 
 import java.util.function.*;
+import java.util.logging.*;
 
 public class Notification
 {
   private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
+  private static final Logger LOG = Logger.getLogger(Notification.class.getName());
 
   public static BiFunction<String, String, Result> phoneNumberValidator = (number, region) ->
   {
@@ -15,7 +17,6 @@ public class Notification
     else if (number.length() == 0)
       return new Failure("### The phone number can not be empty");
     else
-    {
       try
       {
         if (phoneNumberUtil.isValidNumber(phoneNumberUtil.parse(number, region)))
@@ -25,9 +26,8 @@ public class Notification
       }
       catch (NumberParseException e)
       {
-        throw new RuntimeException(e);
+        return new Failure("### Unexpected exception while parsing the phone number %s".formatted(number));
       }
-    }
   };
 
   public void sendNotification(String phoneNumber, String region, String message)
