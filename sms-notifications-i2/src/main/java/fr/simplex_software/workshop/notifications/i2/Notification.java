@@ -3,12 +3,10 @@ package fr.simplex_software.workshop.notifications.i2;
 import com.google.i18n.phonenumbers.*;
 
 import java.util.function.*;
-import java.util.logging.*;
 
 public class Notification
 {
   private static final PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
-  private static final Logger LOG = Logger.getLogger(Notification.class.getName());
 
   public static BiFunction<String, String, Result> phoneNumberValidator = (number, region) ->
   {
